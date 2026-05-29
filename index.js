@@ -6,17 +6,20 @@ const {
 	EmbedBuilder
 } = require('discord.js');
 
+const express = require('express');
+
+const app = express();
+
+app.use(express.json());
+
 const client = new Client({
 	intents: [
 		GatewayIntentBits.Guilds,
-		GatewayIntentBits.GuildMessages,
-		GatewayIntentBits.MessageContent
+		GatewayIntentBits.GuildMessages
 	]
 });
 
-client.once('ready', () => {
-	console.log(`Logged in as ${client.user.tag}`);
-});
+const CHANNEL_ID = '1436760429090181242';
 
 function createDropdown() {
 
@@ -54,48 +57,70 @@ function createDropdown() {
 	return new ActionRowBuilder().addComponents(menu);
 }
 
-client.on('messageCreate', async (message) => {
+client.once('ready', () => {
 
-	if (message.author.bot) {
+	console.log(`Logged in as ${client.user.tag}`);
 
-		if (
-			message.embeds.length > 0 &&
-			message.embeds[0].title === 'Feedback Submission'
-		) {
+});
 
-			try {
+app.post('/feedback', async (req, res) => {
 
-                await message.reply({
-                    content: 'Feedback Controls',
-                    components: [createDropdown()]
-                });
+	try {
 
-				console.log('Dropdown attached.');
+		const {
+			player,
+			userId,
+			feedback,
+			usage
+		} = req.body;
 
-			} catch (err) {
-
-				console.error(err);
-
-			}
-		}
-	}
-
-	if (message.author.bot) return;
-
-	if (message.content === '!test') {
+		const channel = await client.channels.fetch(CHANNEL_ID);
 
 		const embed = new EmbedBuilder()
 			.setTitle('Feedback Submission')
-			.setDescription('The basement ambience became repetitive.')
+			.setDescription(feedback)
 			.addFields(
-				{ name: 'Player', value: 'Bedul (@BedulDah)' },
-				{ name: 'Status', value: 'OPEN' }
+				{
+					name: 'Player',
+					value: player,
+					inline: false
+				},
+				{
+					name: 'User ID',
+					value: String(userId),
+					inline: true
+				},
+				{
+					name: 'Status',
+					value: 'OPEN',
+					inline: true
+				},
+				{
+					name: 'Daily Usage',
+					value: usage,
+					inline: true
+				}
 			)
-			.setColor(0x2f3136);
+			.setColor(0x2f3136)
+			.setFooter({
+				text: 'Jalan Keluar - Feedback System'
+			});
 
-		await message.channel.send({
+		await channel.send({
 			embeds: [embed],
 			components: [createDropdown()]
+		});
+
+		res.status(200).json({
+			success: true
+		});
+
+	} catch (err) {
+
+		console.error(err);
+
+		res.status(500).json({
+			error: 'Failed'
 		});
 	}
 });
@@ -104,56 +129,58 @@ client.on('interactionCreate', async (interaction) => {
 
 	if (!interaction.isStringSelectMenu()) return;
 
-	if (interaction.customId === 'feedback_status') {
+	if (interaction.customId !== 'feedback_status') return;
 
-		const status = interaction.values[0];
+	const status = interaction.values[0];
 
-		const oldEmbed = interaction.message.embeds[0];
+	const oldEmbed = interaction.message.embeds[0];
 
-		const embed = EmbedBuilder.from(oldEmbed);
+	const embed = EmbedBuilder.from(oldEmbed);
 
-		const fields = [...oldEmbed.fields];
+	const fields = [...oldEmbed.fields];
 
-		const statusIndex = fields.findIndex(
-			field => field.name === 'Status'
-		);
+	const statusIndex = fields.findIndex(
+		field => field.name === 'Status'
+	);
 
-		if (statusIndex !== -1) {
+	fields[statusIndex] = {
+		name: 'Status',
+		value: status,
+		inline: true
+	};
 
-			fields[statusIndex] = {
-				name: 'Status',
-				value: status,
-				inline: true
-			};
+	embed.setFields(fields);
 
-			embed.setFields(fields);
-		}
-
-		if (status === 'RESOLVED') {
-			embed.setColor(0x57F287);
-		}
-
-		if (status === 'INVESTIGATING') {
-			embed.setColor(0xFEE75C);
-		}
-
-		if (status === 'INVALID') {
-			embed.setColor(0xED4245);
-		}
-
-		if (status === 'DESIGN FEEDBACK') {
-			embed.setColor(0x5865F2);
-		}
-
-		if (status === 'BUG') {
-			embed.setColor(0xEB459E);
-		}
-
-		await interaction.update({
-			embeds: [embed],
-			components: [createDropdown()]
-		});
+	if (status === 'RESOLVED') {
+		embed.setColor(0x57F287);
 	}
+
+	if (status === 'INVESTIGATING') {
+		embed.setColor(0xFEE75C);
+	}
+
+	if (status === 'INVALID') {
+		embed.setColor(0xED4245);
+	}
+
+	if (status === 'DESIGN FEEDBACK') {
+		embed.setColor(0x5865F2);
+	}
+
+	if (status === 'BUG') {
+		embed.setColor(0xEB459E);
+	}
+
+	await interaction.update({
+		embeds: [embed],
+		components: [createDropdown()]
+	});
+});
+
+app.listen(process.env.PORT || 3000, () => {
+
+	console.log('API running.');
+
 });
 
 client.login(process.env.TOKEN);
