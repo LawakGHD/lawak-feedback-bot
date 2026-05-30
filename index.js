@@ -103,7 +103,7 @@ app.post('/feedback', async (req, res) => {
 			)
 			.setColor(0x2f3136)
 			.setFooter({
-				text: 'Jalan Keluar - Feedback System'
+				text: 'Feedback System'
 			});
 
 		await channel.send({
